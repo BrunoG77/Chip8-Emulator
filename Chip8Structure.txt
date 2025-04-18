@@ -1,0 +1,44 @@
+chip8-emulator/
+├── include/
+│   ├── Config.hpp
+│   ├── Chip8.hpp
+│   └── SDLManager.hpp
+├── src/
+│   ├── Chip8.cpp
+│   ├── SDLManager.cpp
+│   └── main.cpp
+└── Makefile (or CMakeLists.txt)
+
+
+Maybe like this aswell:
+chip8-emulator/
+├── include/
+│   ├── Chip8/
+│   │   ├── Cpu.hpp       // Chip8 CPU logic
+│   │   ├── Display.hpp   // Graphics handling
+│   │   └:: Input.hpp     // Keypad handling
+│   ├── Config.hpp
+│   ├── Chip8.hpp         // Main Chip8 struct
+│   └── SDLManager.hpp
+├── src/
+│   ├── Chip8/
+│   │   ├── Cpu.cpp
+│   │   ├── Display.cpp
+│   │   └:: Input.cpp
+│   ├── Chip8.cpp
+│   ├── SDLManager.cpp
+│   └── main.cpp
+
+
+MAKE
+CXX = g++
+CXXFLAGS = -std=c++2b -Wall -Wextra -Werror
+LDFLAGS = `sdl2-config --cflags --libs`
+
+all: chip8
+
+chip8: chip8.cpp
+	$(CXX) $(CXXFLAGS) chip8.cpp -o chip8 $(LDFLAGS)
+
+clean:
+	rm -f chip8

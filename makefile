@@ -1,11 +1,20 @@
 CXX = g++
-CXXFLAGS = -std=c++2b -Wall -Wextra -Werror
-LDFLAGS = `sdl2-config --cflags --libs`
+CXXFLAGS = -std=c++17 -Wall -Wextra -Werror -Iinclude $(shell sdl2-config --cflags)
+LDFLAGS = $(shell sdl2-config --libs)
 
-all: chip8
+SRC_DIR = src
+SRC = $(wildcard $(SRC_DIR)/*.cpp)
+OBJ = $(SRC:.cpp=.o)
 
-chip8: chip8.cpp
-	$(CXX) $(CXXFLAGS) chip8.cpp -o chip8 $(LDFLAGS)
+TARGET = chip8-emulator
+
+all: $(TARGET)
+
+$(TARGET): $(OBJ)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -f chip8
+	rm -f $(OBJ) $(TARGET)

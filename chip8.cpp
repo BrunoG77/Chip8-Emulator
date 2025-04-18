@@ -27,7 +27,7 @@ struct Config
 };
 
 // Emulator states
-using EmulatorState = enum {
+enum class EmulatorState {
     // state that emulator is running in
     QUIT,
     RUNNING,
@@ -35,7 +35,7 @@ using EmulatorState = enum {
 };
 
 // Chip8 Machine object
-using Chip8 =  struct
+struct Chip8
 {
     EmulatorState state;
 };
@@ -133,7 +133,7 @@ public:
 
 // Initialize chip8 machine
 bool init_chip8(Chip8 *chip8){
-    chip8->state = RUNNING; // Default machine state
+    chip8->state = EmulatorState::RUNNING; // Default machine state
     return true;    // Success
 }
 
@@ -146,10 +146,18 @@ void handle_input(Chip8 *chip8){
         {
         case SDL_QUIT:
             // Exit window. End program
-            chip8->state = QUIT;
+            chip8->state = EmulatorState::QUIT;
             return;
 
         case SDL_KEYDOWN:
+            switch(event.key.keysym.sym) {
+                case SDLK_ESCAPE:
+                    chip8->state = EmulatorState::QUIT;
+                    return;
+
+                default:
+                    break;
+            }
             break;
 
         case SDL_KEYUP:
@@ -183,7 +191,7 @@ int main(int argc, char* argv[]) {
 
         // Main emulator Loop
         // Chip8 has an instruction to conditionally clear the screen
-        while (chip8.state != QUIT){
+        while (chip8.state != EmulatorState::QUIT){
             // Handle input
             handle_input(&chip8);
 
