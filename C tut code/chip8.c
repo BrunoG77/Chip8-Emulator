@@ -28,6 +28,18 @@ typedef enum {
     PAUSED,
 } emulator_state_t;
 
+// Chip8 instruction format
+typedef struct
+{
+    uint16_t opcode; // 2 byte opcode
+    uint16_t NNN;   // 12-bit Address/constant
+    uint8_t NN;     // 8-bit constant
+    uint8_t N;      // 4-bit constant
+    uint8_t X;      // 4-bit register identifier
+    uint8_t Y;      // 4-bit register identifier
+} instruction_t;
+
+
 // Chip8 Machine object
 typedef struct
 {
@@ -42,6 +54,8 @@ typedef struct
 
     uint16_t stack[12]; // Subroutine stack. It has 12 levels os stack. 12 bits each I think
 
+    uint16_t *stack_ptr;
+
     uint8_t V[16];       // Data registers. V0 - VF.
                         // VF is the carry flag, while in subtraction, it is the "no borrow" flag
 
@@ -52,9 +66,11 @@ typedef struct
     uint8_t delay_timer;    // Decrements at 60hz when > 0. More for games to move enemy
     uint8_t sound_timer;    // Decrements at 60hz and plays tone when > 0
 
-    bool keypad[16];    // Hexadecimal keypad 0x0 - 0xF
+    bool keypad[16];        // Hexadecimal keypad 0x0 - 0xF
 
-    const char *rom_name;      // To store the name of the rom that is currently loaded
+    const char *rom_name;   // To store the name of the rom that is currently loaded
+
+    instruction_t inst;     // Currently executing instruction
 } chip8_t;
 
 
@@ -167,6 +183,7 @@ bool init_chip8(chip8_t *chip8, const char rom_name[]){
     chip8->state = RUNNING; // Default machine state
     chip8->PC = entry_point;    // Start program counter at ROM entry point
     chip8->rom_name = rom_name;
+    chip8->stack_ptr = &chip8->stack[0];
 
     return true;    // Success
 }
@@ -201,34 +218,148 @@ void handle_input(chip8_t *chip8){
     while (SDL_PollEvent(&event)) {
         switch (event.type)
         {
-        case SDL_QUIT:
-            // Exit window. End program
-            chip8->state = QUIT;
-            return;
-
-        case SDL_KEYDOWN:
-            switch(event.key.keysym.sym){
-                case SDLK_ESCAPE:
-                // Escape key; Exit window and end the program
+            case SDL_QUIT:
+                // Exit window. End program
                 chip8->state = QUIT;
                 return;
 
-                default:
-                    break;
+            case SDL_KEYDOWN:
+                switch(event.key.keysym.sym){
+                    case SDLK_ESCAPE:
+                        // Escape key; Exit window and end the program
+                        chip8->state = QUIT;
+                        return;
+                    
+                    case SDLK_SPACE:
+                        // Space bar
+                        if (chip8->state == RUNNING) {
+                            chip8->state = PAUSED;  // Pause
+                            puts("=== PAUSED ===");
+                        }
+                        else
+                        {
+                            chip8->state = RUNNING; // Resume
+                        }
+                        return;
+                        
+                    default:
+                        break;
+                }
+                break;
+
+            case SDL_KEYUP:
+                break;
+
+            default:
+                break;
+        }
+    }
+}
+
+#ifdef DEBUG
+    void print_debug_info(chip8_t *chip8) {
+        printf("Address: 0x%04X, Opcode: 0x%04X Desc:", 
+        chip8->PC-2, chip8->inst.opcode);
+        
+        switch ((chip8->inst.opcode >> 12) & 0x0F)
+        {  
+        case 0x00:
+            // if else because there are only 2 cases where they start with 0
+            if (chip8->inst.NN == 0xE0) {
+                // 0x00E0: Clear the screen
+                printf("Clear the screen\n");
+            } else if (chip8->inst.NN == 0xEE)
+            {
+                // 0x00EE: Returns from a subroutine.
+                // Set PC to last address on subroutine stack ("pop" it off the stack)
+                //  so that next opcode will be gotten from that address.
+                printf("Return from subroutine to address: 0x%04X\n", *(chip8->stack_ptr-1));
             }
             break;
 
-        case SDL_KEYUP:
-            break;
+        case 0x02:
+            // 2NNN: Calls subroutine at NNN
+            // the current executing address for this opcode, we already incremented past it
+            // we're pointing to the next one, thats where we'll need to return from the subroutine to keep executing
+            // if we didn't pre-increment, we'd be adding the call to the subroutine stack and enter a infinite loop
+            *chip8->stack_ptr++ = chip8->PC; // ("push" it on the stack) set value and then increment it (++)
 
-        default:
+            // Now make PC NNN cause that is where the subroutine is, so that next opcode is gotten from there
+            chip8->PC = chip8->inst.NNN;
             break;
+        
+        default:
+            printf("Unimplemented or invalid opcode\n");
+            break;  // Unimplemented or invalid opcode
         }
+    }
+#endif
+
+// Emulate 1 Chip8 instruction
+void emulate_instruction(&chip8) {
+    // x86 is small indian architecture
+    // PC is in its instruction address gathering data in 2 bytes big indian
+    // We need grab the first byte, so shift it over to the left, grab it and or that in
+    // For it to read and execute as a big indian value
+    // Get next opcode from RAM
+    chip8->inst.opcode = (chip8->ram[chip8->PC] << 8) | chip8->ram[chip8->PC+1];
+
+    // To read the next opcode on the next go around, increase PC by 2 bytes
+    chip8->PC +=2;  // Pre-increment PC for next opcode, instead of incrementing it later
+
+    // Fill out current instruction format
+    // DXYN is the display opcode || X and Y always appear on those positions like the skip opcode EX9E
+    // To get Y or X we need to shit to the right and then mask those bits
+    chip8->inst.NNN = chip8->inst.opcode & 0x0FFF;
+    chip8->inst.NN = chip8->inst.opcode & 0xFF;
+    chip8->inst.N = chip8->inst.opcode & 0x0F;
+    chip8->inst.Y = (chip8->inst.opcode & >> 4) & 0x0F;
+    chip8->inst.X = (chip8->inst.opcode & >> 8) & 0x0F; 
+
+#ifdef DEBUG
+    print_debug_info(chip8);
+#endif
+
+    // Emulate the 35 opcodes
+    switch ((chip8->inst.opcode >> 12) & 0x0F)
+    {
+    case 0x00:
+        // if else because there are only 2 cases where they start with 0
+        if (chip8->inst.NN == 0xE0) {
+            // 0x00E0: Clear the screen
+            memset(&chip8->display[0], false, sizeof chip8->display);
+        } else if (chip8->inst.NN == 0xEE)
+        {
+            // 0x00EE: Returns from a subroutine.
+            // Set PC to last address on subroutine stack ("pop" it off the stack)
+            //  so that next opcode will be gotten from that address.
+            chip8->PC = *--chip8->stack_ptr // cause it was incremented, we need the decremented value
+        }
+        break;
+
+    case 0x02:
+        // 2NNN: Calls subroutine at NNN
+        // the current executing address for this opcode, we already incremented past it
+        // we're pointing to the next one, thats where we'll need to return from the subroutine to keep executing
+        // if we didn't pre-increment, we'd be adding the call to the subroutine stack and enter a infinite loop
+        *chip8->stack_ptr++ = chip8->PC; // ("push" it on the stack) set value and then increment it (++)
+
+        // Now make PC NNN cause that is where the subroutine is, so that next opcode is gotten from there
+        chip8->PC = chip8->inst.NNN;
+        break;
+    
+    default:
+        break;  // Unimplemented or invalid opcode
     }
 }
 
 // Da main squeeze
 int main(int argc, char **argv) {
+    // Default usage message for args
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <rom_name>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
     // Initialize emulator configuration/options
     config_t config = {0};
@@ -252,10 +383,13 @@ int main(int argc, char **argv) {
         // Handle input
         handle_input(&chip8);
         
-        // if (chip8.state == PAUSED) continue
+        if (chip8.state == PAUSED) continue
 
         // Get_time();
+
         // Emulate CHIP8 instructions
+        emulate_instruction(&chip8);
+
         // Get_time() elapsed since last Get_time();
         //
         // Delay for approximately 60HZ/60FPS, because the CRT TV was 60HZ back then

@@ -1,14 +1,25 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -Werror -Iinclude $(shell sdl2-config --cflags)
+INCLUDES = -Iinclude $(shell sdl2-config --cflags)
+SRC_DIR = src
+SRC = $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(SRC_DIR)/Chip8/*.cpp)
+OBJ = $(SRC:.cpp=.o)
+TARGET = chip8
+
+# Compiler flags for each build type
+DEBUG_FLAGS = -std=c++17 -Wall -Wextra -Werror $(INCLUDES) -g -DDEBUG
+RELEASE_FLAGS = -std=c++17 -Wall -Wextra -Werror $(INCLUDES) -O3
+
 LDFLAGS = $(shell sdl2-config --libs)
 
-SRC_DIR = src
-SRC = $(wildcard $(SRC_DIR)/*.cpp)
-OBJ = $(SRC:.cpp=.o)
+.PHONY: all debug release clean
 
-TARGET = chip8-emulator
+all: debug
 
-all: $(TARGET)
+debug: CXXFLAGS = $(DEBUG_FLAGS)
+debug: $(TARGET)
+
+release: CXXFLAGS = $(RELEASE_FLAGS)
+release: $(TARGET)
 
 $(TARGET): $(OBJ)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
