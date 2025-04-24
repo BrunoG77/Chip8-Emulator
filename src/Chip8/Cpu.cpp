@@ -20,7 +20,17 @@ namespace Chip8 {
                 case 0x5000: return "Skips next instruction if VX == VY";
                 case 0x6000: return "Sets VX to NN";
                 case 0x7000: return "Adds NN to VX (carry flag is not changed)";
-
+                case 0x8000:
+                    if ((opcode & 0x000F) == 0x0) return "Sets VX to the value of VY";
+                    if ((opcode & 0x000F) == 0x1) return "Sets VX to VX or VY";
+                    if ((opcode & 0x000F) == 0x2) return "Sets VX to VX and VY";
+                    if ((opcode & 0x000F) == 0x3) return "Sets VX to VX xor VY";
+                    if ((opcode & 0x000F) == 0x4) return "Adds VY to VX";
+                    if ((opcode & 0x000F) == 0x5) return "VY is subtracted from VX";
+                    if ((opcode & 0x000F) == 0x6) return "Shifts VX to the right by 1";
+                    if ((opcode & 0x000F) == 0x7) return "Sets VX to VY minus VX";
+                    if ((opcode & 0x000F) == 0xE) return "Shifts VX to the left by 1";
+                    return "Wrong/Unimplemented Opcode";
                 case 0x9000: return "Skips the next instruction if VX does not equal VY";
                 case 0xA000: return "Sets I to the address NNN";
                 case 0xB000: return "Jumps to the address NNN plus V0";
@@ -80,7 +90,12 @@ namespace Chip8 {
                 machine.PC = machine.stack[--machine.stack_ptr]; 
                 // The stack_ptr is decremented first (--) to point to the most recently pushed value.
                 // The value at that index is retrieved from the stack and assigned to the program counter
+            } else
+            {
+                std::cout << "CALL not implemented because its not necessary for most ROMs"
+                << std::endl;
             }
+            
             break;
 
         case 0x01:
@@ -110,6 +125,35 @@ namespace Chip8 {
             machine.PC = machine.current_inst.NNN;
             break;
 
+        case 0x03:
+            // 0x3XNN: Skips the next instruction if VX equals NN 
+            // (usually the next instruction is a jump to skip a code block)
+            if (machine.V[machine.current_inst.X] == machine.current_inst.NN) {
+                machine.PC += 2;    // Skip to next opcode (2bytes)
+            }
+            break;
+        
+        case 0x04:
+            // 0x4XNN: Skips the next instruction if VX does not equal NN 
+            // (usually the next instruction is a jump to skip a code block)
+            if (machine.V[machine.current_inst.X] != machine.current_inst.NN) {
+                machine.PC += 2;    // Skip to next opcode (2bytes)
+            }
+            break;
+
+        case 0x05:
+            // 0x5XY0: Skips the next instruction if VX equals VY
+            // (usually the next instruction is a jump to skip a code block)
+            if (machine.current_inst.N != 0) {
+                // If its not 0, then its the wrong opcode
+                std::cout << "0x5XY0 -> N is not 0. Wrong Opcode" << std::endl;
+                break;
+            }
+
+            if (machine.V[machine.current_inst.X] == machine.V[machine.current_inst.Y]) {
+                machine.PC += 2;    // Skip to next opcode (2bytes)
+            }
+            break;
 
         case 0x06:
             // 0x6XNN: Set register VX to NN
@@ -121,76 +165,221 @@ namespace Chip8 {
             machine.V[machine.current_inst.X] += machine.current_inst.NN;
             break;
 
+        case 0x08:
+            switch (machine.current_inst.N) {
+                case 0x0:
+                    // 0x8XY0: Sets VX to the value of VY
+                    machine.V[machine.current_inst.X] = machine.V[machine.current_inst.Y];
+                    break;
+                
+                case 0x1:
+                    // 0x8XY1: Sets VX to VX or VY. (bitwise OR operation)
+                    machine.V[machine.current_inst.X] |= machine.V[machine.current_inst.Y];
+                    break;
+                
+                case 0x2:
+                    // 0x8XY2: Sets VX to VX and VY. (bitwise AND operation)
+                    machine.V[machine.current_inst.X] &= machine.V[machine.current_inst.Y];
+                    break;
+                
+                case 0x3:
+                    // 0x8XY3: Sets VX to VX xor VY
+                    machine.V[machine.current_inst.X] ^= machine.V[machine.current_inst.Y];
+                    break;
+
+                case 0x4:
+                    // 0x8XY4: Adds VY to VX. 
+                    // VF is set to 1 when there's an overflow, and to 0 when there is not
+                    std::cout << "V[X]: " << static_cast<uint16_t>(machine.V[machine.current_inst.X])
+                    << " V[Y]: " << static_cast<uint16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
+                    << static_cast<uint16_t>(machine.V[0xF]) << std::endl;
+
+                    if (static_cast<uint16_t>(machine.V[machine.current_inst.X] + 
+                        machine.V[machine.current_inst.Y]) > 255) 
+                    {
+                        machine.V[0xF] = 1;
+                    } else {
+                        machine.V[0xF] = 0;
+                    }
+
+                    machine.V[machine.current_inst.X] += machine.V[machine.current_inst.Y];
+
+                    std::cout << "After Sum -> " << "V[X]: " 
+                    << static_cast<uint16_t>(machine.V[machine.current_inst.X])
+                    << " V[Y]: " << static_cast<uint16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
+                    << static_cast<uint16_t>(machine.V[0xF]) << std::endl;
+
+                    break;
+
+                case 0x5:
+                    // 0x8XY5: VY is subtracted from VX. 
+                    // VF is set to 0 when there's an underflow, 1 when there is not 
+                    std::cout << "V[X]: " << static_cast<int16_t>(machine.V[machine.current_inst.X])
+                    << " V[Y]: " << static_cast<int16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
+                    << static_cast<int16_t>(machine.V[0xF]) << std::endl;
+
+                    if (machine.V[machine.current_inst.X] >= machine.V[machine.current_inst.Y]){
+                        machine.V[0xF] = 1;
+                    } else {
+                        // V[Y] is bigger then V[X] So the result will be negative and underflow (borrow)
+                        machine.V[0xF] = 0; // Underflow
+                    }
+
+                    machine.V[machine.current_inst.X] -= machine.V[machine.current_inst.Y];
+
+                    std::cout << "After Subtraction VX=VX-VY -> " << "V[X]: " 
+                    << static_cast<int16_t>(machine.V[machine.current_inst.X])
+                    << " V[Y]: " << static_cast<int16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
+                    << static_cast<int16_t>(machine.V[0xF]) << std::endl;
+                    break;
+
+                case 0x6:
+                    // 0x8XY6: Shifts VX to the right by 1, 
+                    // then stores the least significant bit of VX prior to the shift into VF.
+                    // X is a 4-bit register identifier so if its 10 -> 1010, we store 0
+                    machine.V[0xF] = machine.V[machine.current_inst.X] & 1; 
+
+                    // shift right so the 10 -> 1010 will now be 5 -> 0101
+                    machine.V[machine.current_inst.X] >>= 1;
+                    break;
+
+                case 0x7:
+                    // 0x8XY7: Sets VX to VY minus VX. 
+                    // VF is set to 0 when there's an underflow, and 1 when there is not 
+                    std::cout << "V[X]: " << static_cast<int16_t>(machine.V[machine.current_inst.X])
+                    << " V[Y]: " << static_cast<int16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
+                    << static_cast<int16_t>(machine.V[0xF]) << std::endl;
+
+                    if (machine.V[machine.current_inst.Y] >= machine.V[machine.current_inst.X]){
+                        machine.V[0xF] = 1;
+                    } else {
+                        // V[Y] is bigger then V[X] So the result will be negative and underflow (borrow)
+                        machine.V[0xF] = 0; // Underflow
+                    }
+                    
+                    machine.V[machine.current_inst.X] = machine.V[machine.current_inst.Y] - 
+                                                        machine.V[machine.current_inst.X];
+
+                    std::cout << "After Subtraction VX=VY-VX -> " << "V[X]: " 
+                    << static_cast<int16_t>(machine.V[machine.current_inst.X])
+                    << " V[Y]: " << static_cast<int16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
+                    << static_cast<int16_t>(machine.V[0xF]) << std::endl;
+                    break;
+
+                case 0xE:
+                    // 0x8XYE: Shifts VX to the left by 1, then sets VF to 1 if the most significant bit of VX 
+                    // prior to that shift was set, or to 0 if it was unset
+                    // This is same as if
+                    machine.V[0xF] = (machine.V[machine.current_inst.X] & 0x80) >> 7; // isolate most significant bit
+
+                    machine.V[machine.current_inst.X] <<= 1;
+                    break;
+
+                default:
+                    // Wrong/unimplemented opcode
+                    break;
+            }
+            break;
+        
+        case 0x09:
+            // 0x9XY0: Skips the next instruction if VX does not equal VY
+            // (usually the next instruction is a jump to skip a code block)
+            if (machine.current_inst.N != 0) {
+                // If its not 0, then its the wrong opcode
+                std::cout << "0x9XY0 -> N is not 0. Wrong Opcode" << std::endl;
+                break;
+            }
+
+            if (machine.V[machine.current_inst.X] != machine.V[machine.current_inst.Y]) {
+                machine.PC += 2;    // Skip to next opcode (2bytes)
+            }
+            break;
+
         case 0x0A:
             // 0xANNN: Set index register I to NNN
             machine.I = machine.current_inst.NNN;
             break;
 
+        case 0x0B:
+            // BNNN: Jumps to the address NNN plus V0;
+            machine.PC = machine.current_inst.NNN + machine.V[0x0];
+
+            // DEBUG
+            #ifdef DEBUG
+                std::cout << "NNN: " << std::hex << machine.current_inst.NNN 
+                << " V0: " << machine.V[0x0]
+                << " Jump to NNN + V0: " << machine.PC
+                << std::dec << std::endl;
+            #endif
+            break;
         
-            case 0x0D: {
-                // 0xDXYN: Draw N- height sprite at coordinates X,Y 
-                // Read from memory location I
-                // Screen pixels are XOR'd with sprite bits, 
-                // VF (carry flag) is set if any screen pixels are set off
-                // This is useful for collision detection or other reasons
-                // V[X] modulo(%) 64(resolution window width)
-                uint8_t X_coord = machine.V[machine.current_inst.X] % config.window_width;
-                uint8_t Y_coord = machine.V[machine.current_inst.Y] % config.window_height;
-                const uint8_t orig_X = X_coord; // Original X coordinate
-                
-                machine.V[0xF] = 0;    // Initialize carry flag to 0
+        case 0x0D: {
+            // 0xDXYN: Draw N- height sprite at coordinates X,Y 
+            // Read from memory location I
+            // Screen pixels are XOR'd with sprite bits, 
+            // VF (carry flag) is set if any screen pixels are set off
+            // This is useful for collision detection or other reasons
+            // V[X] modulo(%) 64(resolution window width) Modulo ensures coordinates wrap around the screen
+            // If X or Y is larger than the display width/height, it wraps back to zero.
+            // If X = 66 and window_width = 64, 66 % 64 = 2 → pixel is drawn at column 2, not 66.
+            uint8_t X_coord = machine.V[machine.current_inst.X] % config.window_width;  // gives the X position 
+            uint8_t Y_coord = machine.V[machine.current_inst.Y] % config.window_height; // gives the Y position 
+            const uint8_t orig_X = X_coord; // Original X coordinate
             
-                // Read each row of the sprite and loop over all N rows of the sprite
-                for (uint8_t i = 0; i < machine.current_inst.N; i++) {
-                    // Get next byte/row of sprite data
-                    const uint8_t sprite_data = machine.ram[machine.I + i]; // i is the offset
-            
-                    X_coord = orig_X;   // Reset X for next row to draw
-            
-                    // Check all 8 bits of row
-                    for (int8_t j = 7; j >= 0; j--) {
-                        bool pixel = machine.display[Y_coord * config.window_width + X_coord];
-                        const bool sprite_bit = (sprite_data & (1 << j));
-                        // Check if bit is on. Testing the bit left to right
-                        // 1 << 7 (1 shift left by seven) will be the top most bit
-                        // If sprite pixel/bit is on and display pixel is on, set carry flag
-                        if (sprite_bit && pixel) {
-                            machine.V[0xF] = 1; // Set
-                        }
-            
-                        // XOR display pixel with sprite pixel/bit to set it on/off
-                        pixel ^= sprite_bit;
-            
-                        // Update the display pixel
-                        machine.display[Y_coord * config.window_width + X_coord] = pixel;
-            
-                        // Stop drawing if hits the right edge of the screen
-                        if (++X_coord >= config.window_width) break;
+            machine.V[0xF] = 0;    // Initialize carry flag to 0
+        
+            // Read each row of the sprite and loop over all N rows of the sprite (height N)
+            // Each row is a byte in memory starting at address I
+            for (uint8_t i = 0; i < machine.current_inst.N; i++) {
+                // Get next byte/row of sprite data
+                const uint8_t sprite_data = machine.ram[machine.I + i]; // i is the offset
+        
+                X_coord = orig_X;   // Reset X for next row to draw
+        
+                // Loop over each bit in the sprite byte (width 8), Check all 8 bits of row
+                // Bit index within the sprite byte (from 7 down to 0, left to right).
+                for (int8_t j = 7; j >= 0; j--) {
+                    bool pixel = machine.display[Y_coord * config.window_width + X_coord];
+                    const bool sprite_bit = (sprite_data & (1 << j));
+                    // Check if bit is on. Testing the bit left to right
+                    // 1 << 7 (1 shift left by seven) will be the top most bit
+                    // If sprite pixel/bit is on and display pixel is on, set carry flag
+                    if (sprite_bit && pixel) {
+                        machine.V[0xF] = 1; // Set
                     }
-            
-                    // Stop drawing the entire sprite if it hits the bottom edge of the screen
-                    if (++Y_coord >= config.window_height) break;
+        
+                    // XOR display pixel with sprite pixel/bit to set it on/off
+                    pixel ^= sprite_bit;
+        
+                    // Update the display pixel
+                    machine.display[Y_coord * config.window_width + X_coord] = pixel;
+        
+                    // Stop drawing if hits the right edge of the screen
+                    if (++X_coord >= config.window_width) break;
                 }
-
-                // DEBUG
-                #ifdef DEBUG
-                    std::cout << "DRAW: X=" << static_cast<uint16_t>(machine.current_inst.X)
-                            << " Y=" << static_cast<uint16_t>(machine.current_inst.Y)
-                            << " N=" << static_cast<uint16_t>(machine.current_inst.N)
-                            << " V[X]=" << static_cast<uint16_t>(machine.V[machine.current_inst.X])
-                            << " V[Y]=" << static_cast<uint16_t>(machine.V[machine.current_inst.Y])
-                            << " I=0x" << std::hex << machine.I << std::dec
-                            << " Sprite Data:";
-                    for (int i = 0; i < machine.current_inst.N; ++i) {
-                        std::cout << " " << std::hex << static_cast<uint16_t>(machine.ram[machine.I + i]);
-                    }
-                    std::cout << std::endl;
-                #endif
-
-                break;
-            }
-            
         
+                // Stop drawing the entire sprite if it hits the bottom edge of the screen
+                if (++Y_coord >= config.window_height) break;
+            }
+
+            // DEBUG
+            #ifdef DEBUG
+                std::cout << "DRAW: X=" << static_cast<uint16_t>(machine.current_inst.X)
+                        << " Y=" << static_cast<uint16_t>(machine.current_inst.Y)
+                        << " N=" << static_cast<uint16_t>(machine.current_inst.N)
+                        << " V[X]=" << static_cast<uint16_t>(machine.V[machine.current_inst.X])
+                        << " V[Y]=" << static_cast<uint16_t>(machine.V[machine.current_inst.Y])
+                        << " I=0x" << std::hex << machine.I << std::dec
+                        << " Sprite Data:";
+                for (int i = 0; i < machine.current_inst.N; ++i) {
+                    std::cout << " " << std::hex << static_cast<uint16_t>(machine.ram[machine.I + i]);
+                }
+                std::cout << std::endl;
+            #endif
+
+            break;
+        }
+            
         default:
             throw std::runtime_error("Unimplemented opcode");
         }

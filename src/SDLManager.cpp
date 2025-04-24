@@ -56,6 +56,7 @@ namespace Chip8 {
     }
 
     void SDLManager::update_window(const Config config, const Machine machine) {
+        // Initialize rectangle
         SDL_Rect rect = {.x = 0, 
             .y = 0, 
             .w = static_cast<int>(config.scale_factor), 
@@ -75,8 +76,10 @@ namespace Chip8 {
         // Loop through all display pixels, draw a rectangle per pixel to the SDL window
         for (uint32_t i = 0; i < machine.display.size(); i++) {
             // Translate 1D index i value to 2D X/Y coordinates
-            rect.x = (i % config.window_width) * config.scale_factor;
-            rect.y = (i / config.window_width) * config.scale_factor;   // 64/64 is 1 | 128/64 is 2 etc. That is each 64 pixel width row
+            // (i % config.window_width) -> If window_width is 64, pixels 0–63 are in row 0, 64–127 in row 1, etc.
+            rect.x = (i % config.window_width) * config.scale_factor;   // If i = 70: 70 % 64 = 6 -> column 6.
+            // Get each 64 pixel width row
+            rect.y = (i / config.window_width) * config.scale_factor;   // If i = 70: 70 / 64 = 1 → row 1
 
             if (machine.display[i]) {
                 // The i pixel in the display is on, draw foreground color
