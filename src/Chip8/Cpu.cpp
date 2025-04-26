@@ -1,5 +1,6 @@
 #include "Chip8/Cpu.hpp"
 #include <stdexcept>
+#include <iostream>
 
 #ifdef DEBUG
     #include <iostream>
@@ -38,13 +39,34 @@ namespace Chip8 {
                                         "on a random number (Typically: 0 to 255) and NN";
                 case 0xD000: return "Draws a sprite at coordinate (VX, VY) "
                                         "that has a width of 8 pixels and a height of N pixels";
-                default: return "Unknown/Unimplemented opcode";
+                case 0xE000:
+                    if ((opcode & 0x00FF) == 0x9E) return "Skip the next instruction if the key stored in VX"
+                                                            " is pressed";
+                    if ((opcode & 0x00FF) == 0xA1) return "Skip the next instruction if the key stored in VX" 
+                                                            " is not pressed";
+                    return "Wrong/Unimplemented Opcode";
+                case 0xF000:
+                    if ((opcode & 0x00FF) == 0x07) return "Sets VX to the value of the delay timer";
+                    if ((opcode & 0x00FF) == 0x0A) return "A key press is awaited, and then stored in VX";
+                    if ((opcode & 0x00FF) == 0x15) return "Sets the delay timer to VX";
+                    if ((opcode & 0x00FF) == 0x18) return "Sets the sound timer to VX";
+                    if ((opcode & 0x00FF) == 0x1E) return "Adds VX to I. For non-Amiga Chip8, VF is not affected";
+                    if ((opcode & 0x00FF) == 0x29) return "Sets I to the location of the sprite in memory"
+                                                            " for the character in VX";
+                    if ((opcode & 0x00FF) == 0x33) return "Stores the binary-coded decimal representation of VX"
+                                                            " at memory offset from I";
+                    if ((opcode & 0x00FF) == 0x55) return "Stores from V0 to VX (including VX) in memory,"
+                                                            " starting at address I";
+                    if ((opcode & 0x00FF) == 0x65) return "Fills from V0 to VX (including VX) with values from memory,"
+                                                            " starting at address I ";
+                    return "Wrong/Unimplemented Opcode";
             }
+            return "Unknown/Unimplemented opcode";
         }
     #endif
 
     // Emulate 1 machine instruction
-    void emulate_instruction(Machine& machine, const Config config) {
+    void emulate_instruction(Machine& machine, const Config& config) {
         // x86 is small indian architecture
         // PC is in its instruction address gathering data in 2 bytes big indian
         // We need grab the first byte, so shift it over to the left, grab it and or that in
@@ -194,13 +216,8 @@ namespace Chip8 {
                     << " V[Y]: " << static_cast<uint16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
                     << static_cast<uint16_t>(machine.V[0xF]) << std::endl;
 
-                    if (static_cast<uint16_t>(machine.V[machine.current_inst.X] + 
-                        machine.V[machine.current_inst.Y]) > 255) 
-                    {
-                        machine.V[0xF] = 1;
-                    } else {
-                        machine.V[0xF] = 0;
-                    }
+                    machine.V[0xF] = ((machine.V[machine.current_inst.X] + 
+                        machine.V[machine.current_inst.Y]) > 0xFF ? 1 : 0);
 
                     machine.V[machine.current_inst.X] += machine.V[machine.current_inst.Y];
 
@@ -218,12 +235,9 @@ namespace Chip8 {
                     << " V[Y]: " << static_cast<int16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
                     << static_cast<int16_t>(machine.V[0xF]) << std::endl;
 
-                    if (machine.V[machine.current_inst.X] >= machine.V[machine.current_inst.Y]){
-                        machine.V[0xF] = 1;
-                    } else {
+                    machine.V[0xF] = (machine.V[machine.current_inst.X] >=
+                        machine.V[machine.current_inst.Y] ? 1 : 0);
                         // V[Y] is bigger then V[X] So the result will be negative and underflow (borrow)
-                        machine.V[0xF] = 0; // Underflow
-                    }
 
                     machine.V[machine.current_inst.X] -= machine.V[machine.current_inst.Y];
 
@@ -241,6 +255,13 @@ namespace Chip8 {
 
                     // shift right so the 10 -> 1010 will now be 5 -> 0101
                     machine.V[machine.current_inst.X] >>= 1;
+
+                    // SOME VARIANTS
+                    /*
+                    machine.V[0xF] = machine.V[machine.current_inst.Y] & 1; 
+
+                    machine.V[machine.current_inst.X] = machine.V[machine.current_inst.Y] >> 1;
+                    */
                     break;
 
                 case 0x7:
@@ -312,7 +333,13 @@ namespace Chip8 {
                 << std::dec << std::endl;
             #endif
             break;
-        
+    
+        case 0x0C:
+            // CXNN: Sets VX to the result of a bitwise and operation on a random number and NN
+            // the Random number typically is 0 to 255, so do rand with a modulo of 256
+            machine.V[machine.current_inst.X] = (rand() % 256) & machine.current_inst.NN;
+            break;
+
         case 0x0D: {
             // 0xDXYN: Draw N- height sprite at coordinates X,Y 
             // Read from memory location I
@@ -379,6 +406,112 @@ namespace Chip8 {
 
             break;
         }
+
+        case 0x0E:
+            if (machine.current_inst.NN == 0x9E) {
+                // 0xEX9E: Skips the next instruction if the key stored in VX(only check lowest nibble) is pressed
+                // (usually the next instruction is a jump to skip a code block)
+                if (machine.keypad[machine.V[machine.current_inst.X]]) {
+                    machine.PC += 2;
+                }
+            } else if (machine.current_inst.NN == 0xA1)
+            {
+                // 0xEXA1: Skips the next instruction if the key stored in VX(lowest nibble) is not pressed
+                if (!machine.keypad[machine.V[machine.current_inst.X]]) {
+                    machine.PC += 2;
+                }
+            } else
+            {
+                std::cout << "Opcode not implemented/wrong"
+                << std::endl;
+            }
+            break;
+
+        case 0x0F:
+            switch (machine.current_inst.NN)
+            {
+            case 0x07:
+                // 0xFX07: Sets VX to the value of the delay timer
+                machine.V[machine.current_inst.X] = machine.delay_timer;
+                break;
+
+            case 0x0A: {
+                // 0xFX0A: A key press is awaited, and then stored in VX 
+                // (blocking operation, all instruction halted until next key event, 
+                // delay and sound timers should continue processing)
+                bool any_key_pressed = false;
+
+                for (uint8_t i = 0; i < machine.keypad.size(); i++) {
+                    if (machine.keypad[i]) {
+                        machine.V[machine.current_inst.X] = i;  // i = key (offset into keypad array)
+                        any_key_pressed = true;
+                        break;
+                    }
+
+                    if (!any_key_pressed) {
+                        machine.PC -= 2;    // Keep getting the current opcode to wait for key press
+                        break;
+                    }
+                }
+                break;
+            }
+
+            case 0x15:
+                // 0xFX15: Sets the delay timer to VX
+                machine.delay_timer = machine.V[machine.current_inst.X];
+                break;
+
+            case 0x18:
+                // 0xFX18: Sets the sound timer to VX
+                machine.sound_timer = machine.V[machine.current_inst.X];
+                break;
+
+            case 0x1E:
+                // 0xFX1E: Adds VX to I. For non-Amiga Chip8, VF is not affected
+                machine.I += machine.V[machine.current_inst.X];
+                break;
+
+            case 0x29:
+                // 0xFX29: Sets I to the location of the sprite in memory for the character in VX(0x0-0xF)
+                // Characters 0-F (in hexadecimal) are represented by a 4x5 font (4-bits 5-bytes)
+                // ADD 0x50 because my font starts at that address
+                machine.I = 0x50 + (machine.V[machine.current_inst.X] * 5);
+                break;
+
+            case 0x33:{
+                // 0xFX33: Stores the binary-coded decimal representation of VX at memory offset from I
+                // I = hundreds place, I+1 = tens place, I+2 = ones place 
+                // Binary code: tetris score 0010 0111 1000 -> Score: 278
+                uint8_t bcd = machine.V[machine.current_inst.X]; // e.g 123
+                machine.ram[machine.I+2]= bcd % 10; // 12[3]
+
+                bcd /= 10;  // divide by 10 to get rid of last digit
+                machine.ram[machine.I+1]= bcd % 10; // 1[2]
+
+                bcd /= 10;
+                machine.ram[machine.I]= bcd % 10; // [1]
+                
+                break;
+            }
+
+            case 0x55:
+                // 0xFX55: Stores from V0 to VX (including VX) in memory, starting at address I 
+                // The offset from I is increased by 1 for each value written, but I itself is left unmodified
+                // SCHIP does not increment I, Chip8 does increment I
+                for (uint8_t i = 0; i <= machine.current_inst.X; i++) {
+                    machine.ram[machine.I+i] = machine.V[i];
+                }
+                break;
+
+            case 0x65:
+                // 0xFX65: Fills from V0 to VX (including VX) with values from memory, starting at address I 
+                // The offset from I is increased by 1 for each value read, but I itself is left unmodified
+                for (uint8_t i = 0; i <= machine.current_inst.X; i++) {
+                    machine.V[i] = machine.ram[machine.I+i];
+                }
+                break;
+            }
+            break;
             
         default:
             throw std::runtime_error("Unimplemented opcode");

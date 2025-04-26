@@ -74,6 +74,11 @@ namespace Chip8 {
     }
 
     // Handle the input
+    // Chip8 original keypad        QWERTY
+    // 123C                         1234
+    // 456D                         QWER
+    // 789E                         ASDF
+    // A0BF                         ZXCV
     void handle_input(Machine& machine) {
         SDL_Event event;
 
@@ -82,18 +87,17 @@ namespace Chip8 {
                 case SDL_QUIT:
                     // Exit window. End program
                     machine.state = EmulatorState::QUIT;
+                    std::cout << "=== QUIT ===" << std::endl;
                     break;
 
                 case SDL_KEYDOWN:
-                    // Check if it's the initial press (not held)
-                    if (event.key.repeat == 0) {
-                        switch(event.key.keysym.sym) {
-                            case SDLK_ESCAPE:
+                    switch(event.key.keysym.sym) {
+                        case SDLK_ESCAPE:
                             // Exit window if user presses escape
                             machine.state = EmulatorState::QUIT;
                             std::cout << "=== QUIT ===" << std::endl;
                             break;
-                        
+                    
                         case SDLK_SPACE:    // Space bar
                             // Toggle state
                             if (machine.state == EmulatorState::RUNNING) {
@@ -106,9 +110,58 @@ namespace Chip8 {
                                 std::cout << "=== RESUMED ===" << std::endl;
                             }
                             break;
+                        
+                        // Map qwerty keys to Chip8 COSMAC VIP
+                        case SDLK_1: machine.keypad[0x01] = true; break;
+                        case SDLK_2: machine.keypad[0x02] = true; break;
+                        case SDLK_3: machine.keypad[0x03] = true; break;
+                        case SDLK_4: machine.keypad[0x0C] = true; break;
+
+                        case SDLK_q: machine.keypad[0x04] = true; break;
+                        case SDLK_w: machine.keypad[0x05] = true; break;
+                        case SDLK_e: machine.keypad[0x06] = true; break;
+                        case SDLK_r: machine.keypad[0x0D] = true; break;
+
+                        case SDLK_a: machine.keypad[0x07] = true; break;
+                        case SDLK_s: machine.keypad[0x08] = true; break;
+                        case SDLK_d: machine.keypad[0x09] = true; break;
+                        case SDLK_f: machine.keypad[0x0E] = true; break;
+
+                        case SDLK_z: machine.keypad[0x0A] = true; break;
+                        case SDLK_x: machine.keypad[0x00] = true; break;
+                        case SDLK_c: machine.keypad[0x0B] = true; break;
+                        case SDLK_v: machine.keypad[0x0F] = true; break;
+                    }
+                    break;
+
+                case SDL_KEYUP:
+                    // Check if it's the initial press (not held)
+                    if (event.key.repeat == 0) {
+                        switch(event.key.keysym.sym) {
+                            // Map qwerty keys to Chip8 COSMAC VIP
+                            case SDLK_1: machine.keypad[0x01] = false; break;
+                            case SDLK_2: machine.keypad[0x02] = false; break;
+                            case SDLK_3: machine.keypad[0x03] = false; break;
+                            case SDLK_4: machine.keypad[0x0C] = false; break;
+
+                            case SDLK_q: machine.keypad[0x04] = false; break;
+                            case SDLK_w: machine.keypad[0x05] = false; break;
+                            case SDLK_e: machine.keypad[0x06] = false; break;
+                            case SDLK_r: machine.keypad[0x0D] = false; break;
+
+                            case SDLK_a: machine.keypad[0x07] = false; break;
+                            case SDLK_s: machine.keypad[0x08] = false; break;
+                            case SDLK_d: machine.keypad[0x09] = false; break;
+                            case SDLK_f: machine.keypad[0x0E] = false; break;
+
+                            case SDLK_z: machine.keypad[0x0A] = false; break;
+                            case SDLK_x: machine.keypad[0x00] = false; break;
+                            case SDLK_c: machine.keypad[0x0B] = false; break;
+                            case SDLK_v: machine.keypad[0x0F] = false; break;
                         }
                     }
-                    break;  
+                    break;
+                break;
             }
         }
     }
