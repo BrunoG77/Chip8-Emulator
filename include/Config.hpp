@@ -13,5 +13,10 @@ struct Config
     // Amount to scale a CHIP8 pixel by e.g. 20x will be a 20x larger window
     uint32_t scale_factor = 20;     // Default resolution will now be 1280*640
     bool pixel_outlines = true;     // Draw pixel outlines yes/no
-    uint32_t ints_per_second = 500;// CHIP8 CPU "clock rates" or hertz
+    uint32_t ints_per_second = 700;// CHIP8 CPU "clock rates" or hertz
+    uint32_t square_wave_freq = 440;       // Frequency of square wave sound e.g. 440hz for middle A
+    uint32_t audio_sample_rate = 44100;     // "CD" quality, 44100 hz
+    // int16, cause its little indian or negative volume
+    int16_t volume = 3000;                 // How loud or not is the sound
+    // INT16_MAX would be max volume
 };

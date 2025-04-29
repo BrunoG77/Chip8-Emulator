@@ -1,7 +1,32 @@
 #include "SDLManager.hpp"
-
+#include <iostream>
 
 namespace Chip8 {
+    // Fill out stream/audio buffer with data
+    // Audio callback as static member function
+    static void audio_callback(void* userdata, uint8_t* stream, int len) {
+        AudioState* state = static_cast<AudioState*>(userdata);
+
+        const Config& config = state->config;
+
+        int16_t* buffer = reinterpret_cast<int16_t*>(stream);
+
+        const int samples = len / sizeof(int16_t);
+
+        const int square_wave_period = config.audio_sample_rate / config.square_wave_freq;
+        const int half_square_wave_period = square_wave_period / 2;
+
+        // Filling out 2 bytes at a time(int16_t), len is in bytes, so divide by 2
+        for (int i = 0; i < samples; i++) {
+            if (state->playing_sound) {
+                buffer[i] = ((state->sample_index++ / half_square_wave_period) % 2) ? 
+                             config.volume : -config.volume;
+            } else {
+                buffer[i] = 0; // output silence
+            }
+        }
+    }
+
     // Custom deleter for SDL_Window using Operator OVERLOADING
     // This will overload SDL_Window and add the SDL_DestroyWindow function to the SDL_window function
     // The const qualifier means this operation doesn't modify the SDLWindowDeleter object itself.
@@ -41,6 +66,26 @@ namespace Chip8 {
 
         if (!renderer) {
             throw std::runtime_error(SDL_GetError());
+        }
+
+        // Initialize audio state on the heap
+        audio_state = new AudioState{0, config};
+
+        SDL_AudioSpec want{};
+        want.freq = config.audio_sample_rate;   // 44100hz "CD" quality
+        want.format = AUDIO_S16LSB;             // signed 16 little indian cause its x86
+        want.channels = 1;                      // Mono 1 channel
+        want.samples = 512;
+        want.callback = audio_callback;
+        want.userdata = audio_state;           // To change volume data or other things, passed to audio callback
+        // Safe as long as config outlives audio_dev
+
+        audio_dev = SDL_OpenAudioDevice(nullptr, 0, &want, nullptr, 0);
+
+        if (audio_dev == 0) {
+            delete audio_state;
+            // If its not bigger than 0, has an error
+            throw std::runtime_error("Failed to open Audio device" + std::string(SDL_GetError()) + "\n");
         }
     }
 
@@ -102,8 +147,27 @@ namespace Chip8 {
         SDL_RenderPresent(renderer.get());
     }
 
+    void SDLManager::handle_audio(const Machine& machine) {
+        if (machine.sound_timer > 0 && !audio_state->playing_sound) {
+            SDL_PauseAudioDevice(audio_dev, 0); // Play
+            audio_state->playing_sound = true;
+
+        } else if (machine.sound_timer == 0 && audio_state->playing_sound) {
+            SDL_PauseAudioDevice(audio_dev, 1); // Pause
+            audio_state->playing_sound = false;
+        }
+        std::cout << "Sound Timer: " << machine.sound_timer << ", Playing: " 
+        << audio_state->playing_sound << std::endl;
+    }
+
     // Function Destructor
     SDLManager::~SDLManager() {
+        // Close audio device before quitting
+        if (audio_dev != 0) {
+            SDL_CloseAudioDevice(audio_dev);
+        }
+        delete audio_state;
+
         // Cleanup handled automatically by unique_ptr's custom deleter
         SDL_Quit();
     }

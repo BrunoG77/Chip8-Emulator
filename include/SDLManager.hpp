@@ -6,6 +6,13 @@
 #include <stdexcept>
 
 namespace Chip8 {
+    // AudioState declaration inside Chip8 namespace
+    struct AudioState {
+        uint32_t sample_index = 0;
+        Config config;
+        bool playing_sound = false; // Determine whether to output tone
+    };
+
     // RAII class for managing SDL initialization and cleanup
     // Manage resources via object lifetime (constructor acquires, destructor releases)
     class SDLManager {
@@ -15,6 +22,7 @@ namespace Chip8 {
         
         void clear_window();
         void update_window(const Config config, const Machine machine);
+        void handle_audio(const Machine& machine);
 
         // Delete copy semantics
         SDLManager(const SDLManager&) = delete;
@@ -42,5 +50,10 @@ namespace Chip8 {
         SDLWindowPtr window;
         SDLRendererPtr renderer;
         Config config;
+
+        // SDL audio
+        // Pointer to heap-allocated audio state
+        AudioState* audio_state = nullptr; // Holds audio parameters and state
+        SDL_AudioDeviceID audio_dev = 0; // no unique_ptr needed
     };
 }

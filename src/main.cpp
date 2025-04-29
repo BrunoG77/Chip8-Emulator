@@ -100,15 +100,10 @@ int main(int argc, char* argv[]) {
                 if (machine.delay_timer > 0) --machine.delay_timer;
 
                 // Opcode 0xFX18 sets the sound timer as V[X]
-                if (machine.sound_timer > 0) {
-                    --machine.sound_timer;
+                if (machine.sound_timer > 0) --machine.sound_timer;
 
-                    // Add sound
-
-                } else {
-                    // Stop playing sound
-
-                }
+                // call to play or pause
+                sdl.handle_audio(machine);
 
                 // Subtract the period from the accumulator so it can handle multiple ticks if the loop is slow
                 timer_accum -= timer_period;
