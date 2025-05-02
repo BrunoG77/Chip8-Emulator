@@ -20,7 +20,7 @@ This project accurately emulates the original CHIP-8 system, which was the Chip8
 - **Keyboard input** (maps QWERTY keys to CHIP-8 hex keypad)
 - **ROM hot-reload** (press `L` to reload the current ROM)
 - **Pause/Resume** (press `Space` to pause/resume emulation)
-- **Increase/Decrease Volume** (press `O` and `P` to increase/decrease volume)
+- **Increase/Decrease Volume** (press `O` and `P` to decrease/increase volume)
 - **Clean, modern C++ codebase** (RAII, smart pointers, type-safe containers)
 
 ---
@@ -46,7 +46,7 @@ This project accurately emulates the original CHIP-8 system, which was the Chip8
 - `Space` - Pause/Resume
 - `Esc` - Quit emulator
 - `L` - Reload current ROM
-- `O`/`P` - Increase/Decrease volume
+- `O`/`P` - Decrease/Increase volume
 
 ---
 
@@ -73,7 +73,7 @@ This project accurately emulates the original CHIP-8 system, which was the Chip8
 
 - The emulator window will open and run the ROM.
 - Use the mapped keys for input.
-- Press `Esc` to quit, `Space` to pause/resume, `L` to reload the ROM and `O`/`P` to increase/decrease volume.
+- Press `Esc` to quit, `Space` to pause/resume, `L` to reload the ROM and `O`/`P` to decrease/increase volume.
 
 ---
 
