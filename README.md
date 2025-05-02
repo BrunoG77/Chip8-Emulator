@@ -73,7 +73,7 @@ This project accurately emulates the original CHIP-8 system, which was the Chip8
 
 - The emulator window will open and run the ROM.
 - Use the mapped keys for input.
-- Press `Esc` to quit, `Space` to pause/resume, and `L` to reload the ROM.
+- Press `Esc` to quit, `Space` to pause/resume, `L` to reload the ROM and `O`/`P` to increase/decrease volume.
 
 ---
 
