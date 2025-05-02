@@ -67,13 +67,28 @@ namespace Chip8 {
         std::string_view rom_name;      // To store the name of the rom that is currently loaded
 
         Instruction current_inst{};     // Currently executing instruction
+
+        // RESET
+        void reset() {
+            ram.fill(0);
+            display.fill(false);
+            V.fill(0);
+            stack.fill(0);
+            stack_ptr = 0;
+            I = 0;
+            PC = 0x200;
+            delay_timer = 0;
+            sound_timer = 0;
+            keypad.fill(false);
+            state = EmulatorState::RUNNING;
+        }
     };
 
     // Initialization and core functions
     void init_chip8(Machine& machine, std::string_view rom_name);
 
     // Handle the input
-    void handle_input(Machine& machine);
+    void handle_input(Machine& machine, Config& config);
 }
 
 #include "Chip8/Cpu.hpp"

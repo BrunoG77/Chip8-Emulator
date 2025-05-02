@@ -7,6 +7,9 @@
 namespace Chip8 {
     // Initialize chip8 machine
     void init_chip8(Machine& machine, std::string_view rom_name){
+        // Reset in case of reset
+        machine.reset();
+
         constexpr uint32_t ENTRY_POINT = 0x200; // CHIP8 ROMS will be loaded to 0x200.
         // Before that is reserved for the CHIP8 interpreter
 
@@ -79,7 +82,7 @@ namespace Chip8 {
     // 456D                         QWER
     // 789E                         ASDF
     // A0BF                         ZXCV
-    void handle_input(Machine& machine) {
+    void handle_input(Machine& machine, Config& config) {
         SDL_Event event;
 
         while (SDL_PollEvent(&event)) {
@@ -108,6 +111,29 @@ namespace Chip8 {
                             {
                                 machine.state = EmulatorState::RUNNING; // Resume
                                 std::cout << "=== RESUMED ===" << std::endl;
+                            }
+                            break;
+                        
+                        case SDLK_l:
+                            // "l" will reset CHIP8
+                            init_chip8(machine, machine.rom_name);
+                            break;
+                        
+                        case SDLK_o:
+                            // "o" will decrease volume
+                            if (config.volume > 0) {
+                                std::cout << "\nDECREASE VOLUME to: \n" << std::endl;
+                                config.volume -= 500;
+                                std::cout << config.volume << std::endl;
+                            }
+                            break;
+
+                        case SDLK_p:
+                            // "p" will increase volume
+                            if (config.volume < INT16_MAX) {
+                                std::cout << "\nINCREASE VOLUME to:\n"<< std::endl;
+                                config.volume += 500;
+                                std::cout << config.volume << std::endl;
                             }
                             break;
                         

@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
         // Chip8 has an instruction to conditionally clear the screen
         while (machine.state != Chip8::EmulatorState::QUIT) {
             // Time for input
-            handle_input(machine);
+            handle_input(machine, config);
 
             if (machine.state == Chip8::EmulatorState::PAUSED){
                 // Sleep a bit to avoid 100% CPU usage

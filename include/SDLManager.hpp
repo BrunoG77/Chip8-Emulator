@@ -9,7 +9,8 @@ namespace Chip8 {
     // AudioState declaration inside Chip8 namespace
     struct AudioState {
         uint32_t sample_index = 0;
-        Config config;
+        // Store pointer of the config to always get the current config instead of copy of old object
+        const Config* config = nullptr;
         bool playing_sound = false; // Determine whether to output tone
     };
 
@@ -17,7 +18,7 @@ namespace Chip8 {
     // Manage resources via object lifetime (constructor acquires, destructor releases)
     class SDLManager {
     public:
-        explicit SDLManager(const Config& cfg);
+        explicit SDLManager(Config& cfg);
         ~SDLManager();
         
         void clear_window();
@@ -49,7 +50,7 @@ namespace Chip8 {
 
         SDLWindowPtr window;
         SDLRendererPtr renderer;
-        Config config;
+        Config& config;
 
         // SDL audio
         // Pointer to heap-allocated audio state

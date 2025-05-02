@@ -7,7 +7,7 @@ namespace Chip8 {
     static void audio_callback(void* userdata, uint8_t* stream, int len) {
         AudioState* state = static_cast<AudioState*>(userdata);
 
-        const Config& config = state->config;
+        const Config& config = *(state->config);
 
         int16_t* buffer = reinterpret_cast<int16_t*>(stream);
 
@@ -39,7 +39,7 @@ namespace Chip8 {
         if (renderer) SDL_DestroyRenderer(renderer);
     }
 
-    SDLManager::SDLManager(const Config& cfg) : config(cfg) {
+    SDLManager::SDLManager(Config& cfg) : config(cfg) {
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) != 0) {
             throw std::runtime_error(SDL_GetError());
         }
@@ -69,7 +69,7 @@ namespace Chip8 {
         }
 
         // Initialize audio state on the heap
-        audio_state = new AudioState{0, config};
+        audio_state = new AudioState{0, &config};
 
         SDL_AudioSpec want{};
         want.freq = config.audio_sample_rate;   // 44100hz "CD" quality
