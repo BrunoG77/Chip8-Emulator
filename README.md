@@ -87,23 +87,6 @@ Edit `Config.hpp` to change:
 
 ---
 
-## Project Structure
-
-├── include/
-│ ├── Chip8.hpp
-│ ├── Config.hpp
-│ └── SDLManager.hpp
-├── src/
-│ ├── main.cpp
-│ ├── Chip8.cpp
-│ ├── Chip8/
-│ │ └── Cpu.cpp
-│ └── SDLManager.cpp
-├── makefile
-├── README.md
-
----
-
 ## Tested ROMs
 
 - [x] BC_test.ch8 (opcode test)
