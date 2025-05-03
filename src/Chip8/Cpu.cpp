@@ -67,6 +67,7 @@ namespace Chip8 {
 
     // Emulate 1 machine instruction
     void emulate_instruction(Machine& machine, const Config& config) {
+        bool carry = 0;
         // x86 is small indian architecture
         // PC is in its instruction address gathering data in 2 bytes big indian
         // We need grab the first byte, so shift it over to the left, grab it and or that in
@@ -197,64 +198,84 @@ namespace Chip8 {
                 case 0x1:
                     // 0x8XY1: Sets VX to VX or VY. (bitwise OR operation)
                     machine.V[machine.current_inst.X] |= machine.V[machine.current_inst.Y];
+                    // In original behaviour, in 8XY1/2/3, it reset the carry flag
+                    machine.V[0xF] = 0;
                     break;
                 
                 case 0x2:
                     // 0x8XY2: Sets VX to VX and VY. (bitwise AND operation)
                     machine.V[machine.current_inst.X] &= machine.V[machine.current_inst.Y];
+                    machine.V[0xF] = 0;
                     break;
                 
                 case 0x3:
                     // 0x8XY3: Sets VX to VX xor VY
                     machine.V[machine.current_inst.X] ^= machine.V[machine.current_inst.Y];
+                    machine.V[0xF] = 0;
                     break;
 
                 case 0x4:
                     // 0x8XY4: Adds VY to VX. 
                     // VF is set to 1 when there's an overflow, and to 0 when there is not
+                    #ifdef DEBUG
                     std::cout << "V[X]: " << static_cast<uint16_t>(machine.V[machine.current_inst.X])
                     << " V[Y]: " << static_cast<uint16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
                     << static_cast<uint16_t>(machine.V[0xF]) << std::endl;
+                    #endif
 
-                    machine.V[0xF] = ((machine.V[machine.current_inst.X] + 
-                        machine.V[machine.current_inst.Y]) > 0xFF ? 1 : 0);
+                    carry = ((machine.V[machine.current_inst.X] 
+                                + machine.V[machine.current_inst.Y]) 
+                                > 0xFF);
 
                     machine.V[machine.current_inst.X] += machine.V[machine.current_inst.Y];
 
+                    machine.V[0xF] = carry;
+
+                    #ifdef DEBUG
                     std::cout << "After Sum -> " << "V[X]: " 
                     << static_cast<uint16_t>(machine.V[machine.current_inst.X])
                     << " V[Y]: " << static_cast<uint16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
                     << static_cast<uint16_t>(machine.V[0xF]) << std::endl;
+                    #endif
 
                     break;
 
                 case 0x5:
                     // 0x8XY5: VY is subtracted from VX. 
                     // VF is set to 0 when there's an underflow, 1 when there is not 
+                    #ifdef DEBUG
                     std::cout << "V[X]: " << static_cast<int16_t>(machine.V[machine.current_inst.X])
                     << " V[Y]: " << static_cast<int16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
                     << static_cast<int16_t>(machine.V[0xF]) << std::endl;
+                    #endif
 
-                    machine.V[0xF] = (machine.V[machine.current_inst.X] >=
-                        machine.V[machine.current_inst.Y] ? 1 : 0);
-                        // V[Y] is bigger then V[X] So the result will be negative and underflow (borrow)
+                    // Get carry value first, then do operation and ONLY after set the carry flag
+                    // It's the correct order for the CHIP8 interpreter
+                    carry = (machine.V[machine.current_inst.Y] <= machine.V[machine.current_inst.X]);
 
                     machine.V[machine.current_inst.X] -= machine.V[machine.current_inst.Y];
 
+                    machine.V[0xF] = carry;
+                        // V[Y] is bigger then V[X] So the result will be negative and underflow (borrow)
+                    
+                    #ifdef DEBUG
                     std::cout << "After Subtraction VX=VX-VY -> " << "V[X]: " 
                     << static_cast<int16_t>(machine.V[machine.current_inst.X])
                     << " V[Y]: " << static_cast<int16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
                     << static_cast<int16_t>(machine.V[0xF]) << std::endl;
+                    #endif
                     break;
 
                 case 0x6:
                     // 0x8XY6: Shifts VX to the right by 1, 
                     // then stores the least significant bit of VX prior to the shift into VF.
                     // X is a 4-bit register identifier so if its 10 -> 1010, we store 0
-                    machine.V[0xF] = machine.V[machine.current_inst.X] & 1; 
+                    carry = machine.V[machine.current_inst.Y] & 1;  // Use V[Y] instead of X for Chip8
 
                     // shift right so the 10 -> 1010 will now be 5 -> 0101
-                    machine.V[machine.current_inst.X] >>= 1;
+                    machine.V[machine.current_inst.X] = machine.V[machine.current_inst.Y] >> 1;
+
+                    machine.V[0xF] = carry;
 
                     // SOME VARIANTS
                     /*
@@ -267,9 +288,14 @@ namespace Chip8 {
                 case 0x7:
                     // 0x8XY7: Sets VX to VY minus VX. 
                     // VF is set to 0 when there's an underflow, and 1 when there is not 
+                    #ifdef DEBUG
                     std::cout << "V[X]: " << static_cast<int16_t>(machine.V[machine.current_inst.X])
                     << " V[Y]: " << static_cast<int16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
                     << static_cast<int16_t>(machine.V[0xF]) << std::endl;
+                    #endif
+
+                    machine.V[machine.current_inst.X] = machine.V[machine.current_inst.Y] - 
+                                                        machine.V[machine.current_inst.X];
 
                     if (machine.V[machine.current_inst.Y] >= machine.V[machine.current_inst.X]){
                         machine.V[0xF] = 1;
@@ -277,23 +303,24 @@ namespace Chip8 {
                         // V[Y] is bigger then V[X] So the result will be negative and underflow (borrow)
                         machine.V[0xF] = 0; // Underflow
                     }
-                    
-                    machine.V[machine.current_inst.X] = machine.V[machine.current_inst.Y] - 
-                                                        machine.V[machine.current_inst.X];
 
+                    #ifdef DEBUG
                     std::cout << "After Subtraction VX=VY-VX -> " << "V[X]: " 
                     << static_cast<int16_t>(machine.V[machine.current_inst.X])
                     << " V[Y]: " << static_cast<int16_t>(machine.V[machine.current_inst.Y]) << " VF: " 
                     << static_cast<int16_t>(machine.V[0xF]) << std::endl;
+                    #endif
                     break;
 
                 case 0xE:
                     // 0x8XYE: Shifts VX to the left by 1, then sets VF to 1 if the most significant bit of VX 
                     // prior to that shift was set, or to 0 if it was unset
-                    // This is same as if
-                    machine.V[0xF] = (machine.V[machine.current_inst.X] & 0x80) >> 7; // isolate most significant bit
+                    // Use V[Y]
+                    carry = (machine.V[machine.current_inst.Y] & 0x80) >> 7; // isolate most significant bit
 
-                    machine.V[machine.current_inst.X] <<= 1;
+                    machine.V[machine.current_inst.X] = machine.V[machine.current_inst.Y] << 1;
+
+                    machine.V[0xF] = carry;
                     break;
 
                 default:
@@ -307,7 +334,9 @@ namespace Chip8 {
             // (usually the next instruction is a jump to skip a code block)
             if (machine.current_inst.N != 0) {
                 // If its not 0, then its the wrong opcode
+                #ifdef DEBUG
                 std::cout << "0x9XY0 -> N is not 0. Wrong Opcode" << std::endl;
+                #endif
                 break;
             }
 
@@ -422,8 +451,10 @@ namespace Chip8 {
                 }
             } else
             {
+                #ifdef DEBUG
                 std::cout << "Opcode not implemented/wrong"
                 << std::endl;
+                #endif
             }
             break;
 
@@ -440,10 +471,12 @@ namespace Chip8 {
                 // (blocking operation, all instruction halted until next key event, 
                 // delay and sound timers should continue processing)
                 bool any_key_pressed = false;
+                uint8_t key_pressed = 0xFF;
 
-                for (uint8_t i = 0; i < machine.keypad.size(); i++) {
+                for (uint8_t i = 0; key_pressed == 0xFF && i < machine.keypad.size(); i++) {
                     if (machine.keypad[i]) {
-                        machine.V[machine.current_inst.X] = i;  // i = key (offset into keypad array)
+                        key_pressed = i;    // save pressed key to check until its released
+
                         any_key_pressed = true;
                         break;
                     }
@@ -451,6 +484,17 @@ namespace Chip8 {
                     if (!any_key_pressed) {
                         machine.PC -= 2;    // Keep getting the current opcode to wait for key press
                         break;
+                    } else {
+                        // Key has been pressed, but wait until its released to store value
+                        if (machine.keypad[key_pressed]) {
+                            machine.PC -= 2;
+                        } else {
+                            machine.V[machine.current_inst.X] = key_pressed;    // VX = key pressed
+
+                            // Reset key
+                            key_pressed = 0xFF;
+                            any_key_pressed = false;
+                        }
                     }
                 }
                 break;
@@ -499,7 +543,7 @@ namespace Chip8 {
                 // The offset from I is increased by 1 for each value written, but I itself is left unmodified
                 // SCHIP does not increment I, Chip8 does increment I
                 for (uint8_t i = 0; i <= machine.current_inst.X; i++) {
-                    machine.ram[machine.I+i] = machine.V[i];
+                    machine.ram[machine.I++] = machine.V[i]; // Increment I for Chip8
                 }
                 break;
 
@@ -507,7 +551,7 @@ namespace Chip8 {
                 // 0xFX65: Fills from V0 to VX (including VX) with values from memory, starting at address I 
                 // The offset from I is increased by 1 for each value read, but I itself is left unmodified
                 for (uint8_t i = 0; i <= machine.current_inst.X; i++) {
-                    machine.V[i] = machine.ram[machine.I+i];
+                    machine.V[i] = machine.ram[machine.I++];
                 }
                 break;
             }

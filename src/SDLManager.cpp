@@ -156,8 +156,6 @@ namespace Chip8 {
             SDL_PauseAudioDevice(audio_dev, 1); // Pause
             audio_state->playing_sound = false;
         }
-        std::cout << "Sound Timer: " << machine.sound_timer << ", Playing: " 
-        << audio_state->playing_sound << std::endl;
     }
 
     // Function Destructor

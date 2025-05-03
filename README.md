@@ -89,6 +89,7 @@ Edit `Config.hpp` to change:
 
 ## Tested ROMs
 
+- [x] Timendus CHIP-8 test suite
 - [x] BC_test.ch8 (opcode test)
 - [x] test_opcode.ch8 (opcode test)
 - [x] Various public domain CHIP-8 games
